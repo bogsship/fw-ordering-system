@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block title %}Feedback{% endblock %}
+{% block content %}
+<div class="panel p-4 mx-auto feedback-panel">
+  <p class="eyebrow mb-1">YOUR BOUQUET, YOUR WORDS</p>
+  <h1 class="h2 fw-bold">Review a delivered bouquet</h1>
+  <p class="text-secondary">Feedback is available for flowers from orders marked Delivered.</p>
+  {% if delivered_items %}
+  <form method="post" class="mt-4">
+    <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+    <label class="form-label" for="purchasedItem">Bouquet you received</label>
+    <select class="form-select mb-3" id="purchasedItem" name="purchased_item" required>
+      <option value="">Choose a delivered bouquet</option>
+      {% for item in delivered_items %}
+      <option value="{{ item.order_id }}:{{ item.product_id }}">{{ item.item_name }} · Order #{{ item.order_id }}</option>
+      {% endfor %}
+    </select>
+
+    <label class="form-label" for="rating">Rating</label>
+    <select class="form-select mb-3" id="rating" name="rating" required>
+      <option value="">Choose a rating</option>
+      <option value="5">★★★★★ — Excellent</option>
+      <option value="4">★★★★ — Good</option>
+      <option value="3">★★★ — Okay</option>
+      <option value="2">★★ — Poor</option>
+      <option value="1">★ — Very poor</option>
+    </select>
+
+    <label class="form-label" for="comment">Your feedback</label>
+    <textarea class="form-control mb-3" id="comment" name="comment" rows="4" minlength="2" maxlength="2000" required placeholder="How did you like your bouquet?"></textarea>
+    <button class="btn btn-pink">Submit review</button>
+  </form>
+  {% else %}
+  <div class="empty-state compact mt-4">
+    <span aria-hidden="true">🌷</span>
+    <p class="mb-0">No delivered bouquets are waiting for a review. After an order is marked Delivered, you can rate each flower you bought.</p>
+  </div>
+  {% endif %}
+</div>
+
+{% if my_feedback %}
+<section class="mt-4">
+  <h2 class="h4 fw-bold mb-3">Your reviews</h2>
+  <div class="row g-3">
+    {% for review in my_feedback %}
+    <div class="col-md-6">
+      <article class="panel p-4 h-100">
+        <div class="d-flex justify-content-between gap-3">
+          <strong>{{ review.item_name or 'Bouquet review' }}</strong>
+          <span class="review-stars" aria-label="{{ review.rating }} out of 5 stars">{{ '★' * review.rating }}{{ '☆' * (5-review.rating) }}</span>
+        </div>
+        <p class="small text-secondary mt-1">Order #{{ review.order_number or '—' }} · {{ review.created_at }}</p>
+        <p class="mb-0">{{ review.comment }}</p>
+        {% if review.admin_reply %}
+        <div class="feedback-admin-reply mt-3">
+          <strong>Reply from FuzzyWire</strong>
+          <p class="mb-0">{{ review.admin_reply }}</p>
+        </div>
+        {% endif %}
+      </article>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,212 @@
+{% extends 'base.html' %}
+{% block title %}Custom Bouquet{% endblock %}
+{% block content %}
+<div class="mb-4"><p class="eyebrow">DESIGN YOUR OWN</p><h1 class="h2 fw-bold">Custom Order / Bouquet Customization</h1><p class="text-secondary">Upload a reference photo or draw your design. The admin will see the design with your request.</p></div>
+<form method="post" enctype="multipart/form-data" id="customForm">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}"><input type="hidden" name="drawing_data" id="drawingData">
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <section class="panel p-4 mb-4">
+        <h2 class="h5 fw-bold">1. Upload or Draw Your Design</h2>
+        <div class="nav nav-pills gap-2 mb-3"><button class="nav-link active" type="button" data-mode="upload">Upload Image</button><button class="nav-link" type="button" data-mode="draw">Draw / Paint</button></div>
+        <div id="uploadPanel"><label class="form-label">Choose a reference image (PNG/JPG/WEBP, max 8 MB)</label><input class="form-control" type="file" name="reference_image" id="referenceImage" accept=".png,.jpg,.jpeg,.webp,image/*"><img id="imagePreview" class="design-preview mt-3 d-none" alt="Image preview"></div>
+        <div id="drawPanel" class="d-none"><div class="d-flex gap-3 align-items-center flex-wrap mb-2"><label class="small">Color <input type="color" id="brushColor" value="#e94375" class="form-control form-control-color"></label><label class="small">Brush <input type="range" id="brushSize" min="2" max="24" value="5" class="form-range"></label><button class="btn btn-outline-secondary btn-sm" type="button" id="erase">Eraser</button><button class="btn btn-outline-secondary btn-sm" type="button" id="clear">Clear</button></div><canvas id="canvas" width="700" height="420"></canvas><p class="small text-secondary mt-2">Draw with your mouse or finger. Your drawing will be saved with your order.</p></div>
+      </section>
+      <section class="panel p-4">
+        <h2 class="h5 fw-bold">2. Choose Flowers &amp; Details</h2>
+        <label class="form-label" for="flower">Flower type</label>
+        <select class="form-select mb-1" name="flower_type" id="flower" {% if flower_materials %}required{% endif %}>
+          <option value="">Choose a flower</option>
+          {% for material in flower_materials %}<option value="{{ material.id }}" data-price="{{ material.unit_price }}" data-unit="{{ material.unit }}" data-stock="{{ material.stock }}" data-low-stock-threshold="{{ material.low_stock_threshold }}">{{ material.name }} — ₱{{ '%.2f'|format(material.unit_price) }} / {{ material.unit }}{% if material.stock <= 0 %} (out of stock — request still accepted){% elif material.stock <= material.low_stock_threshold %} (low stock){% endif %}</option>{% endfor %}
+        </select>
+        <p class="small text-secondary">Flower products are managed by the shop and can be added in Custom Materials.</p>
+        {% if not flower_materials %}<p class="small text-warning">No flower products are listed yet. The shop must add products in Custom Materials before a custom request can be submitted.</p>{% endif %}
+        {% if flower_materials and flower_materials|selectattr('stock', 'le', 0)|list %}<p class="small text-warning">Out-of-stock materials can still be requested; the admin will confirm availability and the final quote.</p>{% endif %}
+
+        <label class="form-label mt-3" for="flowerColor">Bouquet color</label>
+        <select class="form-select mb-3" id="flowerColor" name="flower_color" required>
+          {% for color in bouquet_colors %}<option value="{{ color }}" {% if color == 'Pink' %}selected{% endif %}>{{ color }}</option>{% endfor %}
+        </select>
+
+        <label class="form-label mt-3">Size</label>
+        <div class="row g-2 mb-3">{% for name,mul in sizes.items() %}<div class="col-4"><input class="btn-check" type="radio" name="bouquet_size" id="s{{ name }}" value="{{ name }}" data-multiplier="{{ mul }}" {% if name=='Medium' %}checked{% endif %}><label class="option-card w-100" for="s{{ name }}">{{ name }}<br><small>{{ mul }}× flower amount</small></label></div>{% endfor %}</div>
+
+        <label class="form-label">Wrapping style</label>
+        <div class="row g-2 mb-3">
+          {% for material in wrapping_materials %}<div class="col-4"><input class="btn-check" type="radio" name="wrapping_style" id="w{{ material.id }}" value="{{ material.id }}" data-price="{{ material.unit_price }}" data-unit="{{ material.unit }}" data-stock="{{ material.stock }}" data-low-stock-threshold="{{ material.low_stock_threshold }}" {% if loop.first %}checked{% endif %}><label class="option-card w-100" for="w{{ material.id }}">{{ material.name }}<br><small>₱{{ '%.2f'|format(material.unit_price) }} / {{ material.unit }}{% if material.stock <= 0 %} · out of stock{% elif material.stock <= material.low_stock_threshold %} · low stock{% endif %}</small></label></div>{% endfor %}
+        </div>
+        {% if not wrapping_materials %}<p class="small text-secondary">No wrapping materials are currently listed; a basic wrap will be used if you choose other priced materials.</p>{% endif %}
+
+        {% if extra_materials %}
+        <label class="form-label">Optional extra materials</label>
+        <div class="row g-2 mb-3">
+          {% for material in extra_materials %}
+          <div class="col-md-6">
+            <div class="border rounded-3 p-2 h-100">
+              <div class="form-check"><input class="form-check-input extra-material" type="checkbox" name="extra_material_id" value="{{ material.id }}" id="extra{{ material.id }}" data-price="{{ material.unit_price }}" data-stock="{{ material.stock }}" data-low-stock-threshold="{{ material.low_stock_threshold }}"><label class="form-check-label" for="extra{{ material.id }}">{{ material.name }} — ₱{{ '%.2f'|format(material.unit_price) }} / {{ material.unit }}{% if material.stock <= 0 %} <span class="text-warning">(out of stock; request still accepted)</span>{% elif material.stock <= material.low_stock_threshold %} <span class="text-warning">(low stock)</span>{% endif %}</label></div>
+              <label class="small text-secondary" for="qty{{ material.id }}">Quantity per bouquet</label><input class="form-control form-control-sm extra-quantity" type="number" id="qty{{ material.id }}" name="extra_quantity_{{ material.id }}" min="1" max="20" value="1" disabled>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <label class="form-label" for="quantity">Bouquet quantity</label><input class="form-control mb-3" type="number" name="quantity" id="quantity" value="1" min="1" max="20" required>
+        <label class="form-label" for="customMessage">Notes for the florist <span class="text-secondary">(optional)</span></label><textarea class="form-control" id="customMessage" name="custom_message" maxlength="500" rows="3" placeholder="Add any other product or design details"></textarea>
+      </section>
+      <section class="panel p-4 mt-4">
+        <h2 class="h5 fw-bold">3. Delivery &amp; payment</h2>
+        <label class="form-label" for="customPhone">Contact number</label>
+        <input class="form-control mb-3" id="customPhone" name="phone" type="tel" maxlength="30" autocomplete="tel" value="{{ profile.phone or '' }}" required>
+        <fieldset class="mb-3">
+          <legend class="form-label">Fulfillment</legend>
+          <div class="payment-options">
+            <label class="payment-option"><input class="form-check-input" type="radio" name="fulfillment_method" value="Delivery" checked><span><strong>Delivery</strong><small>Laguna only: free in Cavinti; ₱{{ '%.2f'|format(outside_local_delivery_fee) }} in other Laguna municipalities.</small></span></label>
+            <label class="payment-option"><input class="form-check-input" type="radio" name="fulfillment_method" value="Pickup"><span><strong>Pickup</strong><small>{{ shop_location.shop_name }} · {{ shop_location.address }} · Free · <a href="{{ url_for('shop_location') }}">View map</a></small></span></label>
+          </div>
+        </fieldset>
+        <div data-custom-delivery-fields>
+          <h3 class="h6 fw-bold">Delivery address</h3>
+          {% if has_usable_saved_address %}
+          <fieldset class="panel p-3 mb-3">
+            <legend class="form-label fw-semibold">Choose an address</legend>
+            <label class="checkout-address-choice"><input class="form-check-input" type="radio" name="delivery_address_choice" value="saved" checked><span><strong>Use saved profile address</strong><small>{{ profile.delivery_address }}</small></span></label>
+            <label class="checkout-address-choice mt-2"><input class="form-check-input" type="radio" name="delivery_address_choice" value="new"><span><strong>Use a different address</strong></span></label>
+          </fieldset>
+          {% endif %}
+          {% if profile.delivery_address and not has_usable_saved_address %}
+          <p class="small text-warning">Saved address is outside Laguna or needs location details. Enter a Laguna delivery address or choose pickup.</p>
+          {% endif %}
+          <div {% if has_usable_saved_address %}hidden{% endif %} data-custom-address-fields>
+            {% set address_values = profile if has_usable_saved_address else {} %}
+            {% set address_required = true %}
+            {% set address_disabled = has_usable_saved_address %}
+            {% set address_prefix = 'customAddress' %}
+            {% set address_allowed_province_code = laguna_province_code %}
+            {% include '_philippine_address_fields.html' %}
+          </div>
+          <label class="form-check small mt-3"><input class="form-check-input" id="customManualDistanceToggle" name="use_manual_distance" type="checkbox"><span class="form-check-label">Address lookup failed? Use manual distance override.</span></label>
+          <label class="form-label mt-2" for="customManualDistance">Manual distance override (km)</label>
+          <input class="form-control mb-2" id="customManualDistance" name="delivery_distance_km" type="number" min="0.1" max="{{ delivery_distance_max_km }}" step="0.1" placeholder="Only if address lookup fails" disabled>
+          <p class="small text-secondary">Delivery is Laguna-only: free in Cavinti and ₱{{ '%.2f'|format(outside_local_delivery_fee) }} in other Laguna municipalities.</p>
+        </div>
+        <div class="alert alert-info" data-custom-pickup-details hidden><strong>Shop for Pick-up:</strong> {{ shop_location.shop_name }} · {{ shop_location.address }} — no delivery fee. <a href="{{ url_for('shop_location') }}">View map</a></div>
+        <label class="form-label" for="customDeliverySlot">Schedule <span class="text-secondary">(optional)</span></label>
+        <select class="form-select mb-3" id="customDeliverySlot" name="delivery_slot_id">
+          <option value="">No preferred time</option>
+          {% for slot in delivery_slots %}<option value="{{ slot.id }}" data-method="{{ slot.fulfillment_method }}">{{ slot.fulfillment_method }} — {{ slot.starts_at.strftime('%b %d, %Y %I:%M %p') }} ({{ slot.remaining }} spots)</option>{% endfor %}
+        </select>
+        <fieldset>
+          <legend class="form-label">Payment</legend>
+          <div class="payment-options">
+            <label class="payment-option"><input class="form-check-input" type="radio" name="payment_method" value="Cash" checked><span><strong>Cash</strong><small data-custom-cash-label>Pay the rider on delivery.</small></span></label>
+            <label class="payment-option"><input class="form-check-input" type="radio" name="payment_method" value="GCash"><span><strong>GCash + payment proof</strong><small>Pay using the shop's GCash number, then upload your receipt from the order page.</small></span></label>
+          </div>
+        </fieldset>
+        <section class="gcash-payment-instructions panel p-3 mt-3" data-custom-gcash hidden>
+          <h3 class="h6 fw-bold">Shop GCash account</h3>
+          <p class="mb-1"><strong>{{ gcash.name }}</strong></p><p class="mb-1"><strong>Number:</strong> {{ gcash.number }}</p>
+          {% include '_gcash_qr.html' %}
+          <p class="small mb-0">Submit the design first. Pay the final total shown on your order page and upload your screenshot for shop review.</p>
+        </section>
+      </section>
+    </div>
+    <div class="col-lg-5">
+      <aside class="panel p-4 sticky-lg-top" style="top:1rem">
+        <h2 class="h5 fw-bold">Live Price Preview</h2><div class="preview-art">🌷 🌹 🌼<div class="small mt-2">YOUR CUSTOM BOUQUET</div></div>
+        <div class="d-flex justify-content-between border-bottom py-3"><span>Flower</span><strong id="pFlower">Choose material</strong></div>
+        <div class="d-flex justify-content-between border-bottom py-3"><span>Color</span><strong id="pColor">Pink</strong></div>
+        <div class="d-flex justify-content-between border-bottom py-3"><span>Size</span><strong id="pSize">Medium</strong></div>
+        <div class="d-flex justify-content-between border-bottom py-3"><span>Wrapping</span><strong id="pWrap">Not selected</strong></div>
+        <div class="d-flex justify-content-between border-bottom py-3"><span>Extras</span><strong id="pExtras">None</strong></div>
+        <div class="d-flex justify-content-between py-3"><span>Design estimate</span><strong class="price" id="pTotal">₱0.00</strong></div>
+        <p class="small text-secondary">Delivery is free in Cavinti and ₱{{ '%.2f'|format(outside_local_delivery_fee) }} in other Laguna municipalities. The selected delivery municipality sets the fee.</p>
+        <p class="small text-warning" id="stockNotice" hidden>Some selected materials are out of stock. You can still send this request; the admin will confirm availability and final pricing.</p>
+        <button class="btn btn-pink btn-lg w-100" {% if not flower_materials and not wrapping_materials and not extra_materials %}disabled{% endif %}>Submit custom order</button>
+        {% if not flower_materials and not wrapping_materials and not extra_materials %}<p class="small text-warning mt-2 mb-0">Custom ordering is temporarily unavailable until priced materials are added.</p>{% endif %}
+        <p class="small text-secondary mt-3 mb-0">The estimate uses current material prices. Inventory is checked and reserved when the admin confirms; out-of-stock requests may need revision.</p>
+      </aside>
+    </div>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}<script>
+const form=document.getElementById('customForm'), canvas=document.getElementById('canvas'), ctx=canvas.getContext('2d');
+let mode='upload', down=false, erase=false;
+ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.lineCap='round';ctx.lineJoin='round';
+function calc(){
+  const flower=document.getElementById('flower'), selectedFlower=flower.selectedOptions[0];
+  const size=form.querySelector('[name=bouquet_size]:checked'), wrap=form.querySelector('[name=wrapping_style]:checked');
+  const quantity=Math.max(1,Number(document.getElementById('quantity').value||1));
+  const multiplier=Number(size.dataset.multiplier||1);
+  const flowerPrice=Number(selectedFlower?.dataset.price||0), wrapPrice=Number(wrap?.dataset.price||0);
+  let total=(flowerPrice*multiplier+wrapPrice)*quantity;
+  let outOfStock=Boolean(selectedFlower?.value&&Number(selectedFlower.dataset.stock)<=0)
+  ||Boolean(wrap?.value&&Number(wrap.dataset.stock)<=0);
+  let lowStock=Boolean(selectedFlower?.value&&Number(selectedFlower.dataset.stock)>0
+    &&Number(selectedFlower.dataset.stock)<=Number(selectedFlower.dataset.lowStockThreshold))
+  ||Boolean(wrap?.value&&Number(wrap.dataset.stock)>0
+    &&Number(wrap.dataset.stock)<=Number(wrap.dataset.lowStockThreshold));
+  document.querySelectorAll('.extra-material').forEach(check=>{
+  const input=document.getElementById('qty'+check.value), count=Math.max(1,Number(input.value||1));
+  input.disabled=!check.checked;
+  if(check.checked){
+    total+=Number(check.dataset.price)*count*quantity;
+    const stock=Number(check.dataset.stock), threshold=Number(check.dataset.lowStockThreshold);
+    outOfStock=outOfStock||stock<=0;
+    lowStock=lowStock||(stock>0&&stock<=threshold);
+  }
+  });
+  document.getElementById('pFlower').textContent=selectedFlower?.textContent.split(' — ')[0]||'Choose material';
+  document.getElementById('pColor').textContent=document.getElementById('flowerColor').value;
+  document.getElementById('pSize').textContent=size.value;
+  document.getElementById('pWrap').textContent=wrap?.nextElementSibling.textContent.split('\n')[0].trim()||'Admin quote';
+  const extras=[...document.querySelectorAll('.extra-material:checked')].map(check=>check.nextElementSibling.textContent.split(' — ')[0]);
+  document.getElementById('pExtras').textContent=extras.join(', ')||'None';
+  document.getElementById('pTotal').textContent='₱'+total.toFixed(2);
+  document.getElementById('stockNotice').hidden=!outOfStock&&!lowStock;
+  document.getElementById('stockNotice').textContent=outOfStock
+    ? 'Some selected materials are out of stock. You can still send this request; the admin will confirm availability and final pricing.'
+    : 'Some selected materials are low in stock. Inventory is checked again when the admin confirms.';
+}
+const deliveryFields=document.querySelector('[data-custom-delivery-fields]');
+const pickupDetails=document.querySelector('[data-custom-pickup-details]');
+const distanceOverride=document.getElementById('customManualDistanceToggle');
+const distanceInput=document.getElementById('customManualDistance');
+const slotSelect=document.getElementById('customDeliverySlot');
+const addressChoices=form.querySelectorAll('input[name="delivery_address_choice"]');
+const updateFulfillment=()=>{
+  const isPickup=form.querySelector('[name="fulfillment_method"]:checked').value==='Pickup';
+  const isNewAddress=!addressChoices.length||form.querySelector('[name="delivery_address_choice"]:checked')?.value==='new';
+  deliveryFields.hidden=isPickup;
+  pickupDetails.hidden=!isPickup;
+  deliveryFields.querySelectorAll('[data-ph-region],[data-ph-province],[data-ph-city],[data-ph-barangay],input[name="delivery_street_address"]').forEach(field=>{
+    field.required=!isPickup&&isNewAddress;
+    field.disabled=isPickup||(!isNewAddress&&field.matches('[data-ph-region],[data-ph-province],[data-ph-city],[data-ph-barangay],input[name="delivery_street_address"]'));
+  });
+  const manualBarangay=deliveryFields.querySelector('[data-ph-barangay-manual]');
+  manualBarangay.required=!isPickup&&isNewAddress&&!manualBarangay.hidden;
+  distanceInput.disabled=isPickup||!distanceOverride.checked;
+  distanceInput.required=!isPickup&&distanceOverride.checked;
+  const method=isPickup?'Pickup':'Delivery';
+  [...slotSelect.options].forEach(option=>{option.disabled=Boolean(option.dataset.method&&option.dataset.method!==method)});
+  if(slotSelect.selectedOptions[0]?.disabled)slotSelect.value='';
+  document.querySelector('[data-custom-cash-label]').textContent=isPickup?'Pay at the shop when you pick up.':'Pay the rider on delivery.';
+};
+form.addEventListener('change',calc);form.addEventListener('input',calc);calc();
+form.querySelectorAll('[name="fulfillment_method"],[name="delivery_address_choice"],[name="payment_method"]').forEach(input=>input.addEventListener('change',()=>{
+  document.querySelector('[data-custom-gcash]').hidden=form.querySelector('[name="payment_method"]:checked').value!=='GCash';
+  updateFulfillment();
+}));
+distanceOverride.addEventListener('change',updateFulfillment);
+updateFulfillment();
+document.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('active',x===b));document.getElementById('uploadPanel').classList.toggle('d-none',mode!=='upload');document.getElementById('drawPanel').classList.toggle('d-none',mode!=='draw')});
+document.getElementById('referenceImage').onchange=e=>{let f=e.target.files[0],img=document.getElementById('imagePreview');if(!f){img.classList.add('d-none');return}if(f.size>8*1024*1024||!f.type.startsWith('image/')){alert('Choose an image under 8 MB.');e.target.value='';return}img.src=URL.createObjectURL(f);img.classList.remove('d-none')};
+function pos(e){let r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
+canvas.onpointerdown=e=>{down=true;canvas.setPointerCapture(e.pointerId);let p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y)};
+canvas.onpointermove=e=>{if(!down)return;let p=pos(e);ctx.strokeStyle=erase?'#fff':document.getElementById('brushColor').value;ctx.lineWidth=+document.getElementById('brushSize').value;ctx.lineTo(p.x,p.y);ctx.stroke()};
+canvas.onpointerup=canvas.onpointercancel=()=>{down=false;ctx.beginPath()};
+document.getElementById('erase').onclick=()=>{erase=!erase;document.getElementById('erase').textContent=erase?'Brush':'Eraser'};
+document.getElementById('clear').onclick=()=>{ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height)};
+form.onsubmit=()=>{document.getElementById('drawingData').value=mode==='draw'?canvas.toDataURL('image/png'):''};
+</script>{% endblock %}

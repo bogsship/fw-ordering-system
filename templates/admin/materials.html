@@ -1,0 +1,58 @@
+{% extends 'admin/base_admin.html' %}
+{% block title %}Custom Materials{% endblock %}
+{% block admin_content %}
+<div class="admin-page-heading">
+  <div>
+    <p class="eyebrow mb-1">CUSTOM BOUQUETS</p>
+    <h1 class="h2 fw-bold mb-0">Materials and stock</h1>
+  </div>
+</div>
+<p class="text-secondary">Set prices and stock for custom bouquets. Stock is held when a request is confirmed and returned if it is cancelled.</p>
+
+<form class="panel p-3 p-md-4 mb-4" method="post">
+  <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+  <h2 class="h5 fw-bold">Add material</h2>
+  <div class="row g-3 align-items-end">
+    <div class="col-md-4"><label class="form-label" for="newMaterialName">Material name</label><input class="form-control" id="newMaterialName" name="name" maxlength="120" required></div>
+    <div class="col-md-2"><label class="form-label" for="newMaterialCategory">Category</label><select class="form-select" id="newMaterialCategory" name="category" required><option>Flower</option><option>Wrapping</option><option>Extra</option></select></div>
+    <div class="col-md-2"><label class="form-label" for="newMaterialUnit">Unit</label><input class="form-control" id="newMaterialUnit" name="unit" maxlength="40" value="piece" required></div>
+    <div class="col-md-2"><label class="form-label" for="newMaterialPrice">Unit price (₱)</label><input class="form-control" id="newMaterialPrice" name="unit_price" type="number" min="0" step="0.01" required></div>
+    <div class="col-md-1"><label class="form-label" for="newMaterialStock">Stock</label><input class="form-control" id="newMaterialStock" name="stock" type="number" min="0" step="0.01" value="0" required></div>
+    <div class="col-md-1"><label class="form-label" for="newMaterialThreshold">Warn at</label><input class="form-control" id="newMaterialThreshold" name="low_stock_threshold" type="number" min="0" step="0.01" value="5" required></div>
+    <div class="col-12"><button class="btn btn-pink">Add material</button></div>
+  </div>
+</form>
+
+<div class="panel p-3 p-md-4">
+  <div class="d-flex justify-content-between align-items-center mb-3"><h2 class="h5 fw-bold mb-0">Available materials</h2><span class="small text-secondary">{{ materials|length }} materials</span></div>
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead><tr><th>Name</th><th>Type</th><th>Unit</th><th>Price</th><th>Stock</th><th>Warn at</th><th>Shown in shop</th><th></th></tr></thead>
+      <tbody>
+        {% for material in materials %}
+        <tr>
+          <td colspan="8">
+            <form method="post" action="{{ url_for('admin_material_edit', material_id=material.id) }}" class="row g-2 align-items-end">
+              <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+              <div class="col-md-2"><label class="visually-hidden" for="materialName{{ material.id }}">Name</label><input class="form-control form-control-sm" id="materialName{{ material.id }}" name="name" value="{{ material.name }}" maxlength="120" required></div>
+              <div class="col-md-2"><label class="visually-hidden" for="materialCategory{{ material.id }}">Category</label><select class="form-select form-select-sm" id="materialCategory{{ material.id }}" name="category">{% for category in ['Flower','Wrapping','Extra'] %}<option value="{{ category }}" {% if material.category == category %}selected{% endif %}>{{ category }}</option>{% endfor %}</select></div>
+              <div class="col-md-1"><label class="visually-hidden" for="materialUnit{{ material.id }}">Unit</label><input class="form-control form-control-sm" id="materialUnit{{ material.id }}" name="unit" value="{{ material.unit }}" maxlength="40" required></div>
+              <div class="col-md-1"><label class="visually-hidden" for="materialPrice{{ material.id }}">Unit price</label><input class="form-control form-control-sm" id="materialPrice{{ material.id }}" name="unit_price" type="number" min="0" step="0.01" value="{{ '%.2f'|format(material.unit_price) }}" required></div>
+              <div class="col-md-1"><label class="visually-hidden" for="materialStock{{ material.id }}">Stock</label><input class="form-control form-control-sm" id="materialStock{{ material.id }}" name="stock" type="number" min="0" step="0.01" value="{{ material.stock }}" required></div>
+              <div class="col-md-1"><label class="visually-hidden" for="materialThreshold{{ material.id }}">Warn when stock reaches</label><input class="form-control form-control-sm" id="materialThreshold{{ material.id }}" name="low_stock_threshold" type="number" min="0" step="0.01" value="{{ material.low_stock_threshold }}" required></div>
+              <div class="col-md-2 form-check form-switch ms-2"><input class="form-check-input" type="checkbox" id="materialActive{{ material.id }}" name="is_active" value="1" {% if material.is_active %}checked{% endif %}><label class="form-check-label small" for="materialActive{{ material.id }}">Shown to customers</label></div>
+              <div class="col-md-1"><button class="btn btn-sm btn-outline-pink">Update</button></div>
+            </form>
+            <div class="small mt-2 {% if material.stock <= material.low_stock_threshold %}text-danger{% else %}text-secondary{% endif %}">
+              {% if material.stock <= material.low_stock_threshold %}Low stock: {{ material.stock }} {{ material.unit }} remaining{% else %}{{ material.stock }} {{ material.unit }} in stock{% endif %}
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td class="text-secondary py-4">No materials yet. Add materials above to configure custom bouquets.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
